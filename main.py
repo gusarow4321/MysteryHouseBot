@@ -4,16 +4,16 @@ import database
 
 bot = telebot.TeleBot(config.token)
 
-users = dict()
+users = dict()  # словарь пользователей с их прогрессом (название комнаты) и строкой событий (собранные предметы и т.п.)
 
-
+# создание кнопок
 def create_markup(t):
     m = telebot.types.InlineKeyboardMarkup()
     for b in t:
         m.add(telebot.types.InlineKeyboardButton(b[0], callback_data=b[1]))
     return m
 
-
+# отправка сообщения. Если имя изображения есть в папке img - отправит картинку с подписью, а если нет, то отправит просто текст
 def send_mes(user_id, to_send, img_name):
     try:
         with open("img\\" + img_name + ".png", 'rb') as photo:
@@ -35,16 +35,16 @@ def start_handler(message):
 def callback_handler(call):
     data = call.data
     user_id = call.from_user.id
-
+    # Проверяет тип предыдущего сообщ. и изменяет его (убирает кнопки)
     if call.message.content_type == 'text':
         bot.edit_message_text(call.message.text, user_id, call.message.message_id)
     elif call.message.content_type == 'photo':
         bot.edit_message_caption(call.message.caption, user_id, call.message.message_id)
 
     if data == "start game":
-        room, events = database.add_player(user_id, call.from_user.first_name)
-        users[user_id] = [room, events]
-        send_mes(user_id, config.events[room], room)
+        room, events = database.add_player(user_id, call.from_user.first_name)  # Выбирает из бд данные о пользователе
+        users[user_id] = [room, events]  # записывает в словарь
+        send_mes(user_id, config.events[room], room)  # и отправляет нужное сообщение
         return
     elif data == "about":
         ab_markup = telebot.types.InlineKeyboardMarkup()
@@ -52,26 +52,25 @@ def callback_handler(call):
         bot.send_message(user_id, config.about, reply_markup=ab_markup)
         return
     else:
-        if data in users[user_id][1]:
+        if data in users[user_id][1]:  # проверяет случалось ли событие. И если да, то изменяет data
             data = 'not ' + data
-        to_send = config.events[data]
-        users[user_id][0] = data
-        if 'command' in to_send:
+        to_send = config.events[data]  # выборка из events 
+        users[user_id][0] = data  # запись прогресса
+        if 'command' in to_send:  # особые команды, такие как добавить событие или конец игры
             command = to_send['command'].split(' ')
             if 'add' in command:
-                users[user_id][1] += command[1] + ' '
-                database.update_user(user_id, users[user_id][0], users[user_id][1])
-            elif 'fire' in command:
+                users[user_id][1] += command[1] + ' '  # добавление событий в строку через пробел
+                database.update_user(user_id, users[user_id][0], users[user_id][1])  # запись в бд
+            elif 'fire' in command:  # пожар в столовой
+                # если условия верны (то есть у игрока есть кувшин с водой и пожар не случался ранее)
                 if 'fire' not in users[user_id][1] and 'pitcher' in users[user_id][1]:
-                    users[user_id][1] += 'fire '
-                    send_mes(user_id, config.events['fire'], 'fire')
+                    users[user_id][1] += 'fire '  # добавление событий в строку через пробел
+                    send_mes(user_id, config.events['fire'], 'fire')  # отправляет особое сообщ. о пожаре
                     return
             elif 'end_of_game' in command:
-                database.delete_user(user_id)
+                database.delete_user(user_id)  # если игрок умер
 
-        send_mes(user_id, to_send, data)
-
-    print(users[user_id])
+        send_mes(user_id, to_send, data)  # в конце отправляет сообщение
 
 
 if __name__ == "__main__":
