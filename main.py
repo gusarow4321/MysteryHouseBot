@@ -68,7 +68,8 @@ def callback_handler(call):
                     send_mes(user_id, config.events['fire'], 'fire')  # отправляет особое сообщ. о пожаре
                     return
             elif 'end_of_game' in command:
-                database.delete_user(user_id)  # если игрок умер
+                users[user_id][1] = ''  # теперь если игрок погибает, то обнуляется его список событий 
+                database.update_user(user_id, 'yard', '')  # а следующим ходом он попадает на yard, то есть в самую первую локацию
 
         send_mes(user_id, to_send, data)  # в конце отправляет сообщение
 
