@@ -23,11 +23,3 @@ def update_user(user_id, p, event):
     with db:
         cur.execute(f"UPDATE players SET progress='{p}', events='{event}' WHERE user_id={user_id}").fetchall()
     db.close()
-
-
-def delete_user(user_id):
-    db = sqlite3.connect("players.db")
-    cur = db.cursor()
-    with db:
-        cur.execute(f"DELETE FROM players WHERE user_id={user_id}").fetchall()
-    db.close()
