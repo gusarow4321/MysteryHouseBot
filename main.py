@@ -96,7 +96,6 @@ def callback_handler(call):
                 database.update_user(user_id, 'yard', '')
 
         send_mes(user_id, to_send, data)
-    print(users[user_id])
 
 
 if __name__ == "__main__":
