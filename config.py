@@ -1,4 +1,4 @@
-token = "671154971:AAHQGK_JSs2n2rT_aCbRuZ3Z5ZUIT6sh0Sg"
+token = <token>
 
 start_mes = "Mystery House"
 
