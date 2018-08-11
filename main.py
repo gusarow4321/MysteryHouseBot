@@ -4,16 +4,16 @@ import database
 
 bot = telebot.TeleBot(config.token)
 
-users = dict()  # словарь пользователей с их прогрессом (название комнаты) и строкой событий (собранные предметы и т.п.)
+users = dict()
 
-# создание кнопок
+
 def create_markup(t):
     m = telebot.types.InlineKeyboardMarkup()
     for b in t:
         m.add(telebot.types.InlineKeyboardButton(b[0], callback_data=b[1]))
     return m
 
-# отправка сообщения. Если имя изображения есть в папке img - отправит картинку с подписью, а если нет, то отправит просто текст
+
 def send_mes(user_id, to_send, img_name):
     try:
         with open("img\\" + img_name + ".png", 'rb') as photo:
@@ -35,43 +35,68 @@ def start_handler(message):
 def callback_handler(call):
     data = call.data
     user_id = call.from_user.id
-    # Проверяет тип предыдущего сообщ. и изменяет его (убирает кнопки)
+
     if call.message.content_type == 'text':
         bot.edit_message_text(call.message.text, user_id, call.message.message_id)
     elif call.message.content_type == 'photo':
         bot.edit_message_caption(call.message.caption, user_id, call.message.message_id)
 
-    if data == "start game":
-        room, events = database.add_player(user_id, call.from_user.first_name)  # Выбирает из бд данные о пользователе
-        users[user_id] = [room, events]  # записывает в словарь
-        send_mes(user_id, config.events[room], room)  # и отправляет нужное сообщение
-        return
-    elif data == "about":
+    if data == "about":
         ab_markup = telebot.types.InlineKeyboardMarkup()
         ab_markup.add(telebot.types.InlineKeyboardButton("🎮 Начать игру", callback_data="start game"))
         bot.send_message(user_id, config.about, reply_markup=ab_markup)
-        return
+    elif data == "start game" or user_id not in users:
+        room, events = database.add_player(user_id, call.from_user.first_name)
+        if user_id not in users and room != 'yard':
+            bot.send_message(user_id, config.error_mes)
+        users[user_id] = [room, events]
+        send_mes(user_id, config.events[room], room)
     else:
-        if data in users[user_id][1]:  # проверяет случалось ли событие. И если да, то изменяет data
+        if data in users[user_id][1]:
             data = 'not ' + data
-        to_send = config.events[data]  # выборка из events 
-        users[user_id][0] = data  # запись прогресса
-        if 'command' in to_send:  # особые команды, такие как добавить событие или конец игры
-            command = to_send['command'].split(' ')
-            if 'add' in command:
-                users[user_id][1] += command[1] + ' '  # добавление событий в строку через пробел
-                database.update_user(user_id, users[user_id][0], users[user_id][1])  # запись в бд
-            elif 'fire' in command:  # пожар в столовой
-                # если условия верны (то есть у игрока есть кувшин с водой и пожар не случался ранее)
-                if 'fire' not in users[user_id][1] and 'pitcher' in users[user_id][1]:
-                    users[user_id][1] += 'fire '  # добавление событий в строку через пробел
-                    send_mes(user_id, config.events['fire'], 'fire')  # отправляет особое сообщ. о пожаре
-                    return
-            elif 'end_of_game' in command:
-                users[user_id][1] = ''  # теперь если игрок погибает, то обнуляется его список событий 
-                database.update_user(user_id, 'yard', '')  # а следующим ходом он попадает на yard, то есть в самую первую локацию
+        to_send = config.events[data]
+        users[user_id][0] = data
+        if data == 'button':
+            if 'knife' not in users[user_id][1]:
+                send_mes(user_id, config.events['cant use knife'], 'study')
+                return
+        elif data == 'kitchen':
+            if 'hammer' in users[user_id][1]:
+                send_mes(user_id, config.events['push'], 'kitchen')
+                return
+        elif data == 'pantry':
+            if 'kitchen' not in users[user_id][1]:
+                send_mes(user_id, config.events['not pantry'], 'pantry')
+                return
+        elif 'hammer' in data:
+            if 'attic' in users[user_id][1]:
+                send_mes(user_id, config.events['attic'], 'attic')
+                return
 
-        send_mes(user_id, to_send, data)  # в конце отправляет сообщение
+        if 'command' in to_send:
+            command = to_send['command'].split(' ')
+            if 'chest' in command:
+                if 'key' not in users[user_id][1]:
+                    send_mes(user_id, config.events['return chest'], 'no image')
+                    return
+                elif 'chest' in users[user_id][1]:
+                    send_mes(user_id, to_send, data)
+                    return
+
+            if 'add' in command:
+                users[user_id][1] += command[1] + ' '
+                database.update_user(user_id, users[user_id][0], users[user_id][1])
+            elif 'fire' in command:
+                if 'fire' not in users[user_id][1] and 'pitcher' in users[user_id][1]:
+                    users[user_id][1] += 'fire '
+                    send_mes(user_id, config.events['fire'], 'fire')
+                    return
+            elif 'end' in command:
+                users[user_id][1] = ''
+                database.update_user(user_id, 'yard', '')
+
+        send_mes(user_id, to_send, data)
+    print(users[user_id])
 
 
 if __name__ == "__main__":
